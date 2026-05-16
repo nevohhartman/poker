@@ -3,10 +3,10 @@
 
 enum suit_type
 {
-    CLUBS,
-    DIAMONDS,
-    HEARTS,
-    SPADES
+    CLUBS = 0,
+    DIAMONDS = 1,
+    HEARTS = 2,
+    SPADES = 3
 };
 
 enum rank_type
@@ -26,6 +26,19 @@ enum rank_type
     ACE = 14
 };
 
+enum hand_type
+{
+    HIGH_CARD = 0,
+    PAIR = 1,
+    TWO_PAIR = 2,
+    THREE_OAK = 3,
+    STRAIGHT = 4,
+    FLUSH = 5,
+    FULL_HOUSE = 6,
+    FOUR_OAK = 7,
+    STRAIGHT_FLUSH = 8
+};
+
 struct card
 {
     suit_type suit;
@@ -40,8 +53,11 @@ struct player
     bitmap avatar;
     fixed_array<card *, 2> hand;
     bool user;
+    
     int chips;
 };
+
+
 
 
 class betting_display
@@ -64,8 +80,8 @@ private:
     double card_scale_factor = 0.5;
     double card_spacing = 12;
     //CENTRE CARDS
-    double center_card_x = 1200/2 - card_width/2;
-    double center_card_y = 400 - card_height/2;
+    double center_card_x = 1200/2 - card_width*2.5 - 2*card_spacing - 65;
+    double center_card_y = 240 - card_height/2;
 
     // Fold
     const rectangle fold_button = {fold_x, fold_y, fold_width, fold_height};
@@ -98,13 +114,13 @@ private:
     //CENTRE CARDS
 
     //FLOP (FIRST 3 CARDS)
-    rectangle flop_card1 = {center_card_x, center_card_y, card_width, card_height};
-    rectangle flop_card2 = {center_card_x + card_width + card_spacing, center_card_y, card_width, card_height};
-    rectangle flop_card3 = {center_card_x + 2 * (card_width + card_spacing), center_card_y, card_width, card_height};
+    rectangle centre_card1 = {center_card_x, center_card_y, card_width, card_height};
+    rectangle centre_card2 = {center_card_x + card_width + card_spacing, center_card_y, card_width, card_height};
+    rectangle centre_card3 = {center_card_x + 2 * (card_width + card_spacing), center_card_y, card_width, card_height};
     //TURN (4TH CARD)
-
+    rectangle centre_card4 = {center_card_x + 3 * (card_width + card_spacing), center_card_y, card_width, card_height};
     //RIVER (5TH CARD)
-
+    rectangle centre_card5 = {center_card_x + 4 * (card_width + card_spacing), center_card_y, card_width, card_height};
 
 
     void draw_button(const rectangle &button, const color &button_color, const string &label)
@@ -130,14 +146,16 @@ public:
 
     void display(double move1 = 0, double move2 = 0)
     {
-        flop_card1 = {center_card_x + move1, center_card_y, card_width, card_height};
-        flop_card2 = {center_card_x + card_width + card_spacing + move1, center_card_y, card_width, card_height};
-        flop_card3 = {center_card_x + 2 * (card_width + card_spacing) + move1, center_card_y, card_width, card_height};
+        centre_card1 = {center_card_x + move1, center_card_y + move2, card_width, card_height};
+        centre_card2 = {center_card_x + card_width + card_spacing + move1, center_card_y + move2, card_width, card_height};
+        centre_card3 = {center_card_x + 2 * (card_width + card_spacing) + move1, center_card_y + move2, card_width, card_height};
         draw_bitmap(bitmap_named("card1"), card1.x, card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         draw_bitmap(bitmap_named("card2"), card2.x, card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-        draw_bitmap(bitmap_named("card1"), flop_card1.x, flop_card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-        draw_bitmap(bitmap_named("card2"), flop_card2.x, flop_card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-        draw_bitmap(bitmap_named("card1"), flop_card3.x, flop_card3.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        draw_bitmap(bitmap_named("card1"), centre_card1.x, centre_card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        draw_bitmap(bitmap_named("card2"), centre_card2.x, centre_card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        draw_bitmap(bitmap_named("card1"), centre_card3.x, centre_card3.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        draw_bitmap(bitmap_named("card2"), centre_card4.x, centre_card4.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        draw_bitmap(bitmap_named("card1"), centre_card5.x, centre_card5.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         draw_button(fold_button, COLOR_RED, "Fold");
         draw_button(call_button, COLOR_BLUE, "Call");
         draw_button(minus_button, COLOR_GRAY, "-");
@@ -169,7 +187,215 @@ private:
         return &deck[index];
     }
 
+
+
+
+
 public:
+    game()
+    {
+        // FILL DECK
+        for (int i = 0; i < 52; i++)
+        {
+            deck[i].suit = (suit_type)(i / 13);
+            deck[i].rank = (rank_type)(i % 13 + 2);
+        }
+    }
+
+
+    void reshuffle()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            for(int j = 0; j < 2; j++)
+            {
+                players[i].hand[j]->drawn = false;
+                players[i].hand[j] = nullptr;
+            }
+        }
+
+        for(int i = 0; i < 5; i++)
+        {
+            board_cards[i]->drawn = false;
+            board_cards[i] = nullptr;
+        }
+    }
+
+    void deal_cards()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            for(int j = 0; j < 2; j++)
+            {
+                players[i].hand[j] = deal();
+            }
+        }
+
+        for (int i = 0; i < 5; i++)
+        {
+            board_cards[i] = deal();
+        }
+    }
+
+
+
+
+    void insertion_sort(fixed_array<card*, 7> &cards)
+    {
+        for (int i = 1; i < 7; i++)
+        {
+            card* key = cards[i];
+
+            int j = i -1;
+
+            while (j >= 0 && cards[j]->rank > key->rank)
+            {
+                cards[j+1] = cards[j];
+                j--;
+            }
+            cards[j+1] = key;
+        }
+    }
+
+
+
+    ///HAND EVALUATION
+
+
+
+    int flush(const int (&suit)[3], const fixed_array<card*, 7> &cards)
+    {
+        for(int i = 0; i < 3; i++)
+        {
+            if (suit[i] == 5)
+            {
+                for (int i = 6; i > 3; i--)
+                {
+                    if (cards[i]->suit == i)
+                    {
+                        return cards[i]->rank;
+                    }
+                }
+            }
+        }
+
+        return -1;
+
+    }
+
+
+
+
+    int straight_flush(const fixed_array<card*, 7> &cards)
+    {   
+
+        int tally = 0;
+        int high = 0;
+        for (int i = 6; i > 0; i--)
+        {
+            if (tally == 0 && i == 3)
+            {
+                return -1;
+            }
+
+            if (tally == 5)
+            {
+                return high;
+            }
+
+            if (cards[i]->rank - 1 == cards[i-1]->rank && cards[i]->suit == cards[i-1]->suit)
+            {
+                if (tally == 0)
+                {
+                    high = cards[i]->rank;
+                }
+                tally ++;
+
+            }
+        }
+
+    }
+
+    int straight(const int (&freq)[15])
+    {
+        int tally = 0;
+        int high = 0;
+        for (int i = 14; i < 1; i--)
+        {
+            if (tally == 5)
+            {
+                return high;
+            }
+
+            if (tally == 0 && i == 4 )
+            {
+                return -1;
+            }
+
+            if (freq[i] >= 3)
+            {
+                return -1;
+            }
+
+
+            if(freq[i] > 0 && freq[i-1] > 0)
+            {
+                if (tally == 0)
+                {
+                    high = i;
+                }
+                tally ++;
+            } 
+
+        }
+
+        return -1;
+    }
+
+    void hand_eval(player &player)
+    {
+        fixed_array<card*, 7> cards;
+
+
+
+        //FILL CARDS
+        for (int i = 0; i < 7; i++)
+        {
+            if(i < 5)
+            {
+                cards[i] = board_cards[i];
+            }
+            else
+            {
+                cards[i] = player.hand[i-5];
+            }
+        }
+
+        //SORT THEM
+        insertion_sort(cards);
+
+        int frequency[15] = {0};
+        int suit[3] = {0};
+
+
+        for (int i = 0; i < 7; i++)
+        {
+            frequency[cards[i]->rank] ++;
+            if(cards[i]->rank == 14)
+            {
+                frequency[1] ++;
+            }
+
+            suit[cards[i]->suit] ++;
+        }
+        
+
+
+        //CHECK FLUSH
+        
+
+    }
+
 };
 
 class display_handler
@@ -250,6 +476,12 @@ class display_handler
 
 };
 
+
+
+
+
+
+
 int main()
 {
     player my_player;
@@ -266,7 +498,7 @@ int main()
     open_window("poker", 1200, 800);
     int move1 = 0;
     int move2 = 0;
-    int speed = 1;
+    int speed = 5;
     while (!quit_requested())
     {
 
@@ -289,9 +521,10 @@ int main()
             move2 += speed;
         }
         process_events();
-        betting.display();
+        betting.display(move1, move2);
         refresh_screen(60);
     }
 
+    write_line(to_string(move1) + " " + to_string(move2));
     return 0;
 }
