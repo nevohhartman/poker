@@ -1,0 +1,8 @@
+
+git add .
+git commit -m "journal entry 2026-05-15"
+git push
+
+
+touch journal/2026-05-16.md
+code journal/2026-05-16.md
