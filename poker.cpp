@@ -352,8 +352,8 @@ public:
         return -1;
     }
 
-
     int multiple()
+    
     void hand_eval(player &player)
     {
         fixed_array<card*, 7> cards;
