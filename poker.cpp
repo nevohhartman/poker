@@ -244,7 +244,7 @@ public:
 
     }
 
-    void display(double move1 = 0, double move2 = 0, const int &chips = 500, const int &card_count = 0, const int &call_amount = 50, const int &raise_amount = 50, int players_in)
+    void display(double move1 = 0, double move2 = 0, const int &chips = 500, const int &card_count = 0, const int &call_amount = 50, const int &raise_amount = 50)
     {
         centre_card1 = {center_card_x + move1, center_card_y + move2, card_width, card_height};
         centre_card2 = {center_card_x + card_width + card_spacing + move1, center_card_y + move2, card_width, card_height};
@@ -297,6 +297,9 @@ public:
 
 
         draw_bitmap("p1", 590, 45);    // top centre (opponent)
+
+        draw_bitmap("back", 430, 45);   // card 1
+        draw_bitmap("back", 510, 45);   // card 2
         draw_bitmap("p2", 45, 175);    // left (opponent)
         draw_bitmap("p3", 1005, 175);  // right (opponent)
 
