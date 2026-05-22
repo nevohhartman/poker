@@ -233,9 +233,18 @@ public:
             centre_cards[0]->image = load_bitmap("Centre Card " + to_string(i + 1), card_to_display(centre_cards[i]->suit,centre_cards[i]->rank));
         }
 
+        //PLAYER LOADING
+        load_bitmap("p1", "player1.jpeg");
+        load_bitmap("p2", "player2.jpeg");
+        load_bitmap("p3", "player3.jpeg");
+
+        //BACK CARD LOAD
+        load_bitmap("back", "back.png");
+
+
     }
 
-    void display(double move1 = 0, double move2 = 0, const int &chips = 500, const int &card_count = 0, const int &call_amount = 50, const int &raise_amount = 50)
+    void display(double move1 = 0, double move2 = 0, const int &chips = 500, const int &card_count = 0, const int &call_amount = 50, const int &raise_amount = 50, int players_in)
     {
         centre_card1 = {center_card_x + move1, center_card_y + move2, card_width, card_height};
         centre_card2 = {center_card_x + card_width + card_spacing + move1, center_card_y + move2, card_width, card_height};
@@ -285,6 +294,12 @@ public:
         {
             draw_bitmap(bitmap_named("Centre Card " + to_string(i+1)), centre_card1.x + i*(card_spacing +card_width), centre_card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         }
+
+
+        draw_bitmap("p1", 590, 45);    // top centre (opponent)
+        draw_bitmap("p2", 45, 175);    // left (opponent)
+        draw_bitmap("p3", 1005, 175);  // right (opponent)
+
 
         refresh_screen(60);
     }
@@ -872,6 +887,7 @@ int main()
     new_game.return_player(0).chips = 400;
     betting_display betting(new_game.return_player(0).hand,new_game.return_centre());
 
+
     while (!quit_requested())
     {
 
@@ -897,8 +913,8 @@ int main()
 
 
         process_events();
-        betting.display(move1, move2,300, 3);
-        new_game.player_turn(call_amount,betting,3);
+        betting.display(move1, move2,300, 5);
+        new_game.player_turn(call_amount,betting,5);
     }
 
     write_line(to_string(move1) + " " + to_string(move2));
