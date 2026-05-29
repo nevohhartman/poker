@@ -47,26 +47,50 @@ struct card
     bool drawn = false;
 };
 
+
+enum actions
+{
+    null = 0,
+    call = 1,
+    raise = 2,
+    fold = 3
+};
+
+
 struct player
 {
     string name;
     bitmap avatar;
     fixed_array<card *, 2> hand;
     bool user;
-    bool fold;
+    bool fold = false;
 
     int hand_score;
-
+    int last_action = null;
     int bet;
     int chips;
+
+
+
+    int image_x;
+    int image_y;
 };
 
 
+struct p_round
+{
+    int pot = 0;
+    int card_count = 0;
+    int blind_i = 0;
+    int call_amount = 0;
+    int turn_i = 0;
+};
 
 class betting_display
 {
 private:
 
+    #pragma region Constants
     bool flop;
     bool turn;
     bool river;
@@ -128,9 +152,12 @@ private:
     rectangle centre_card4 = {center_card_x + 3 * (card_width + card_spacing), center_card_y, card_width, card_height};
     // RIVER (5TH CARD)
     rectangle centre_card5 = {center_card_x + 4 * (card_width + card_spacing), center_card_y, card_width, card_height};
+    #pragma endregion
 
+    //PLAYER ACTIONS:
 
-
+    rectangle action = {0,0, 100,40};
+    
 
     void draw_button(const rectangle &button, const color &button_color, 
                     const string &label, const string &label2 = "")
@@ -215,7 +242,35 @@ private:
         return suit_result + rank_result + ".png";
     }
 
+
+    void draw_text_bubble(const string &text, double x, double y)
+    {
+        int font_size = 16;
+        double padding = 10;
+        double tw = text_width(text, "Roboto", font_size);
+        double th = text_height(text, "Roboto", font_size);
+
+        double box_w = tw + padding * 2;
+        double box_h = th + padding * 2;
+
+        // Background
+        fill_rectangle(COLOR_WHITE, x, y, box_w, box_h);
+        draw_rectangle(COLOR_BLACK, x, y, box_w, box_h);
+
+        // Tail (little triangle pointing down)
+        fill_triangle(COLOR_WHITE, 
+            x + box_w / 2 - 8, y + box_h,
+            x + box_w / 2 + 8, y + box_h,
+            x + box_w / 2,     y + box_h + 12);
+        draw_line(COLOR_BLACK, x + box_w / 2 - 8, y + box_h, x + box_w / 2, y + box_h + 12);
+        draw_line(COLOR_BLACK, x + box_w / 2 + 8, y + box_h, x + box_w / 2, y + box_h + 12);
+
+        // Text
+        draw_text(text, COLOR_BLACK, "Roboto", font_size, x + padding, y + padding);
+    }
+
 public:
+
 
     
     betting_display(const fixed_array<card *, 2> &player_cards, const fixed_array<card *, 5> &centre_cards)
@@ -230,7 +285,7 @@ public:
 
         for (int i = 0; i < 5; i++)
         {
-            centre_cards[0]->image = load_bitmap("Centre Card " + to_string(i + 1), card_to_display(centre_cards[i]->suit,centre_cards[i]->rank));
+            centre_cards[i]->image = load_bitmap("Centre Card " + to_string(i + 1), card_to_display(centre_cards[i]->suit,centre_cards[i]->rank));
         }
 
         //PLAYER LOADING
@@ -244,66 +299,164 @@ public:
 
     }
 
-    void display(double move1 = 0, double move2 = 0, const int &chips = 500, const int &card_count = 0, const int &call_amount = 50, const int &raise_amount = 50)
+    void draw_card_pair(const int &x, const int &y)
     {
-        centre_card1 = {center_card_x + move1, center_card_y + move2, card_width, card_height};
-        centre_card2 = {center_card_x + card_width + card_spacing + move1, center_card_y + move2, card_width, card_height};
-        centre_card3 = {center_card_x + 2 * (card_width + card_spacing) + move1, center_card_y + move2, card_width, card_height};
+        draw_bitmap("back", x + 430, y+ 45,option_scale_bmp(150.0/334.0,150.0/334.0));   // card 1
+        draw_bitmap("back", x + 510, y + 45,option_scale_bmp(150.0/334.0,150.0/334.0));   // card 2
+    }
+    void draw_ai_cards(const int &i)
+    {
+
+        switch(i)
+        {
+            case 0:
+                break;
+            case 1: 
+                draw_card_pair(490,200); // Right
+                break;
+            case 2:
+                draw_card_pair(-108,-90); // Top
+                break;
+            case 3:
+                draw_card_pair(-470,200); // Left
+                break;
+            default:
+                break;
+        }
+
+    }
+
+
+
+    void draw_ai(const int &i, const player &player)
+    {
+        switch(i)
+        {
+            case 0:
+                break;
+            case 1: 
+                draw_card_pair(490,200); // Right
+                draw_action(player)
+                break;
+            case 2:
+                draw_card_pair(-108,-90); // Top
+                break;
+            case 3:
+                draw_card_pair(-470,200); // Left
+                break;
+            default:
+                break;
+        }
+    }
+
+    void draw_action(const player &player)
+    {
+        string action;
+        switch(player.last_action)
+        {
+            case null:
+            come back
+        }
+    }   
+
+    
+    void display(const p_round &round, const fixed_array<player, 4> &players, double move1 = 0, double move2 = 0,  const int &raise_amount = 50)
+    {
+
+
+
+
+
+
+
 
         // PLAYER CARDS
         draw_bitmap(bitmap_named("Player Card 1"), card1.x, card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         draw_bitmap(bitmap_named("Player Card 2"), card2.x, card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-
-        if (call_amount == 0)
-        {
-            draw_button(call_button, COLOR_ORANGE, "CHECK");
-        }
-        else
-        {
-           draw_button(call_button, COLOR_ORANGE, "Call" , to_string(call_amount)); 
-        }
-        draw_button(fold_button, COLOR_RED, "Fold");
-        if (raise_amount == call_amount)
-        {
-            draw_button(minus_button, rgb_color(170, 130, 120), "-");  
-        }
-        else
-        {
-            draw_button(minus_button, COLOR_SALMON, "-"); 
-        }
         
-        if (call_amount + raise_amount >= chips - call_amount)
-        {
-            draw_button(plus_button, rgb_color(170, 130, 120), "+"); 
-        }
-        else
-        {
-            draw_button(plus_button, COLOR_SALMON, "+");
-        }
-        draw_button(raise_button, COLOR_PURPLE, "Raise" , to_string(call_amount + raise_amount));
+
+        #pragma region Buttons
+        if (round.turn_i == 0)
+            {
+            if (round.call_amount == 0)
+            {
+                draw_button(call_button, COLOR_ORANGE, "CHECK");
+            }
+            else
+            {
+            draw_button(call_button, COLOR_ORANGE, "Call" , to_string(round.call_amount)); 
+            }
+            draw_button(fold_button, COLOR_RED, "Fold");
+            if (raise_amount == round.call_amount)
+            {
+                draw_button(minus_button, rgb_color(170, 130, 120), "-");  
+            }
+            else
+            {
+                draw_button(minus_button, COLOR_SALMON, "-"); 
+            }
+            
+            if (round.call_amount + raise_amount >= players[0].chips - round.call_amount)
+            {
+                draw_button(plus_button, rgb_color(170, 130, 120), "+"); 
+            }
+            else
+            {
+                draw_button(plus_button, COLOR_SALMON, "+");
+            }
+            draw_button(raise_button, COLOR_PURPLE, "Raise" , to_string(round.call_amount + raise_amount));
+        
+
+            draw_button(all_in_button, COLOR_ORANGE, "ALL IN");
+        }   
+
+        
+        draw_button(chips_display, COLOR_BLACK, "Chips: " + to_string(players[0].chips));
+        #pragma endregion
 
 
-        draw_button(all_in_button, COLOR_ORANGE, "ALL IN");
-        draw_button(chips_display, COLOR_BLACK, "Chips: " + to_string(chips));
 
 
-
-
-
-        for (int i = 0; i < card_count; i ++)
+        for (int i = 0; i < round.card_count; i ++)
         {
             draw_bitmap(bitmap_named("Centre Card " + to_string(i+1)), centre_card1.x + i*(card_spacing +card_width), centre_card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         }
 
 
-        draw_bitmap("p1", 590, 45);    // top centre (opponent)
-
-        draw_bitmap("back", 430, 45);   // card 1
-        draw_bitmap("back", 510, 45);   // card 2
-        draw_bitmap("p2", 45, 175);    // left (opponent)
-        draw_bitmap("p3", 1005, 175);  // right (opponent)
 
 
+
+
+        
+
+
+
+
+        draw_bitmap("p2", 590, 45);    // top centre (opponent)
+        draw_bitmap("p3", 45, 175);    // left (opponent)
+        draw_bitmap("p1", 1005, 175);  // right (opponent)
+        
+
+
+
+
+        // Draws AI CARDS
+        for (int i = 1; i < 4; i++)
+        {
+            if (players[i].fold != true)
+            {
+                draw_ai_cards(i);
+            }
+        }
+
+
+
+
+        draw_text_bubble("FOLD", 590, 10);   // above top player
+
+
+
+        
         refresh_screen(60);
     }
 };
@@ -409,6 +562,16 @@ public:
             deck[i].suit = (suit_type)(i / 13);
             deck[i].rank = (rank_type)(i % 13 + 2);
         }
+
+
+        //Player Images
+        players[1].image_x = 1005;
+        players[1].image_y = 175;
+        players[2].image_x = 590;
+        players[2].image_y = 45;
+        players[3].image_x = 45;
+        players[3].image_y = 175;
+
     }
 
     void reshuffle()
@@ -478,7 +641,7 @@ public:
 
     int flush(const int (&suit)[4], const fixed_array<card *, 7> &cards)
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 4; i++)
         {
             if (suit[i] == 5)
             {
@@ -521,6 +684,8 @@ public:
                 tally++;
             }
         }
+
+        return hand_hash(STRAIGHT_FLUSH, high, 0);
     }
 
     int straight(const int (&freq)[15])
@@ -738,13 +903,14 @@ public:
         return false;
     }
 
-    void player_turn(int &call_amount, betting_display &display, const int &card_count = 0)
+    void player_turn(betting_display &display, p_round &round)
     {
 
+    
         players[0].bet = 0;
 
         bool turn_complete = false;
-        int min_raise = call_amount;
+        int min_raise = round.call_amount;
         int raise_amount = min_raise;
         int raise_increment = BIG_BLIND;
 
@@ -753,7 +919,7 @@ public:
             clear_screen(COLOR_GREEN);
             process_events();
 
-            display.display(0,0,players[0].chips,card_count, call_amount, raise_amount);
+            display.display(round, players, 0, 0, raise_amount);
 
             if(click_check(fold_button))
             {
@@ -766,9 +932,9 @@ public:
                 players[0].bet = players[0].chips;
                 turn_complete = true;
             }
-            else if (click_check(call_button) && call_amount <= players[0].chips)
+            else if (click_check(call_button) && round.call_amount <= players[0].chips)
             {
-                players[0].bet = call_amount;
+                players[0].bet = round.call_amount;
                 turn_complete = true;
             }
             else if (click_check(minus_button) && raise_amount != min_raise)
@@ -785,14 +951,14 @@ public:
             else if (click_check(plus_button))
             {
                 raise_amount += raise_increment;
-                if (raise_amount + call_amount > players[0].chips)
+                if (raise_amount + round.call_amount > players[0].chips)
                 {
-                    raise_amount = players[0].chips - call_amount;
+                    raise_amount = players[0].chips - round.call_amount;
                 }
             }
             else if (click_check(raise_button))
             {
-                players[0].bet = raise_amount + call_amount;
+                players[0].bet = raise_amount + round.call_amount;
                 turn_complete = true;
             }
             
@@ -850,23 +1016,14 @@ public:
     {
         return players[index];
     }
-};
 
-class display_handler
-{
-private:
-    // #region Card Display
-
-    // #endregion
-
-    void player_display(player &p, double scale_factor, double x, double y)
+    fixed_array<player, 4> return_players()
     {
-
-        x = x - (260 * scale_factor) - 50;
-        draw_bitmap(p.hand[0]->image, x, y + 210 * scale_factor, option_scale_bmp(scale_factor, scale_factor));
-        draw_bitmap(p.hand[1]->image, x + 260 * scale_factor, y + 210 * scale_factor, option_scale_bmp(scale_factor, scale_factor));
+        return players;
     }
 };
+
+
 
 int main()
 {
@@ -880,7 +1037,7 @@ int main()
     open_window("poker", 1200, 800);
     int move1 = 0;
     int move2 = 0;
-    int speed = 5;
+    int speed = 3;
 
     game new_game = game();
 
@@ -890,7 +1047,13 @@ int main()
     new_game.return_player(0).chips = 400;
     betting_display betting(new_game.return_player(0).hand,new_game.return_centre());
 
+    p_round new_round;
 
+    new_round.blind_i = 0;
+    new_round.call_amount = 50;
+    new_round.card_count = 3;
+    new_round.pot = 0;
+    new_round.turn_i = 0;
     while (!quit_requested())
     {
 
@@ -916,8 +1079,8 @@ int main()
 
 
         process_events();
-        betting.display(move1, move2,300, 5);
-        new_game.player_turn(call_amount,betting,5);
+        betting.display(new_round, new_game.return_players(), 0, 0, 50);
+        //new_game.player_turn(call_amount,betting,5);
     }
 
     write_line(to_string(move1) + " " + to_string(move2));
