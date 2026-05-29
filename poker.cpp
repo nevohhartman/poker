@@ -43,17 +43,17 @@ struct card
 {
     suit_type suit;
     rank_type rank;
-    bitmap image = nullptr;
     bool drawn = false;
+    bitmap face;
 };
 
 
 enum actions
 {
-    null = 0,
-    call = 1,
-    raise = 2,
-    fold = 3
+    NO_ACTION = 0,
+    CALL = 1,
+    RAISE = 2,
+    FOLD = 3
 };
 
 
@@ -66,14 +66,14 @@ struct player
     bool fold = false;
 
     int hand_score;
-    int last_action = null;
+    int last_action = NO_ACTION;
     int bet;
     int chips;
 
+    int raise_amount;
 
-
-    int image_x;
-    int image_y;
+    double image_x;
+    double image_y;
 };
 
 
@@ -91,6 +91,8 @@ class betting_display
 private:
 
     #pragma region Constants
+
+    const double img_height = bitmap_height(bitmap_named("p1"));
     bool flop;
     bool turn;
     bool river;
@@ -275,24 +277,27 @@ public:
     
     betting_display(const fixed_array<card *, 2> &player_cards, const fixed_array<card *, 5> &centre_cards)
     {
+        write_line("LOADING FONT");
         load_font("Roboto", "Roboto.ttf");
+        write_line("LOADED");
 
         flop = false;
         turn = false;
         river = false;
-        player_cards[0]->image =load_bitmap("Player Card 1",card_to_display(player_cards[0]->suit, player_cards[0]->rank));
-        player_cards[1]->image =load_bitmap("Player Card 2",card_to_display(player_cards[1]->suit, player_cards[1]->rank));
-
+        write_line("CARD 1 lOADINg");
+        load_bitmap("Player Card 1",card_to_display(player_cards[0]->suit, player_cards[0]->rank));
+        load_bitmap("Player Card 2",card_to_display(player_cards[1]->suit, player_cards[1]->rank));
+        write_line("LOADED");
         for (int i = 0; i < 5; i++)
         {
-            centre_cards[i]->image = load_bitmap("Centre Card " + to_string(i + 1), card_to_display(centre_cards[i]->suit,centre_cards[i]->rank));
+            load_bitmap("Centre Card " + to_string(i + 1), card_to_display(centre_cards[i]->suit,centre_cards[i]->rank));
         }
-
+        write_line("LOADED");
         //PLAYER LOADING
         load_bitmap("p1", "player1.jpeg");
         load_bitmap("p2", "player2.jpeg");
         load_bitmap("p3", "player3.jpeg");
-
+        write_line("LOADED");
         //BACK CARD LOAD
         load_bitmap("back", "back.png");
 
@@ -328,38 +333,113 @@ public:
 
 
 
-    void draw_ai(const int &i, const player &player)
-    {
-        switch(i)
-        {
-            case 0:
-                break;
-            case 1: 
-                draw_card_pair(490,200); // Right
-                draw_action(player)
-                break;
-            case 2:
-                draw_card_pair(-108,-90); // Top
-                break;
-            case 3:
-                draw_card_pair(-470,200); // Left
-                break;
-            default:
-                break;
-        }
-    }
-
     void draw_action(const player &player)
     {
         string action;
         switch(player.last_action)
         {
-            case null:
-            come back
+            case NO_ACTION:
+                break;
+            case CALL:
+                draw_text_bubble("CALL",player.image_x, player.image_y - 35.00);
+                break;
+            case RAISE:
+                draw_text_bubble("RAISE: " + to_string(player.raise_amount),player.image_x, player.image_y - 35.00);
+                break;
+            case FOLD:
+                draw_text_bubble("FOLD",player.image_x, player.image_y - 35.00);
+                break;
+            default:
+                break;
         }
     }   
+        
+    void draw_chips(int chips, double x, double y)
+    {
+        int font_size = 16;
+        double padding = 8;
+        string text = "$ " + to_string(chips);
+        double tw = text_width(text, "Roboto", font_size);
+        double th = text_height(text, "Roboto", font_size);
 
-    
+        double box_w = tw + padding * 2;
+        double box_h = th + padding * 2;
+
+        double box_x = x + (150 - box_w) / 2;
+
+        // dark blue outline
+        fill_rectangle(rgb_color(20, 40, 80), box_x - 2, y - 2, box_w + 4, box_h + 4);
+        // steel blue background
+        fill_rectangle(rgb_color(70, 110, 180), box_x, y, box_w, box_h);
+        // white text
+        draw_text(text, COLOR_WHITE, "Roboto", font_size,
+                box_x + padding, y + padding);
+    }
+
+    void draw_ai(const int &i, const player &player)
+    {
+        
+        draw_action(player);
+        
+        if (player.last_action != FOLD) 
+        {
+            switch(i)
+            {
+                case 0:
+                    break;
+                case 1: 
+                    draw_card_pair(490,200); // Right
+                    break;
+                case 2:
+                    draw_card_pair(-108,-90); // Top
+                    break;
+                case 3:
+                    draw_card_pair(-470,200); // Left
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        draw_chips(player.chips, player.image_x, player.image_y + img_height + 155);
+    }
+
+
+    void draw_pot(int pot)
+    {
+        int font_size = 22;          // bigger font
+        double padding = 12;         // more padding
+        string text = "POT: $" + to_string(pot);
+        double tw = text_width(text, "Roboto", font_size);
+        double th = text_height(text, "Roboto", font_size);
+
+        double box_w = tw + padding * 2;
+        double box_h = th + padding * 2;
+
+        double box_x = 1200 / 2.0 - box_w / 2;
+        double box_y = 420;
+
+        fill_rectangle(rgb_color(120, 90, 0), box_x - 2, box_y - 2, box_w + 4, box_h + 4);
+        fill_rectangle(rgb_color(212, 175, 55), box_x, box_y, box_w, box_h);
+        draw_text(text, rgb_color(60, 30, 0), "Roboto", font_size,
+                box_x + padding, box_y + padding);
+    }
+
+
+    void draw_player_chips(int chips, double x, double y, double width, double height)
+    {
+        int font_size = 28;  // bigger font
+        string text = "$ " + to_string(chips);
+        double tw = text_width(text, "Roboto", font_size);
+        double th = text_height(text, "Roboto", font_size);
+
+        fill_rectangle(rgb_color(20, 40, 80), x - 2, y - 2, width + 4, height + 4);
+        fill_rectangle(rgb_color(70, 110, 180), x, y, width, height);
+
+        draw_text(text, COLOR_WHITE, "Roboto", font_size,
+                x + (width - tw) / 2,
+                y + (height - th) / 2);
+    }
     void display(const p_round &round, const fixed_array<player, 4> &players, double move1 = 0, double move2 = 0,  const int &raise_amount = 50)
     {
 
@@ -371,9 +451,12 @@ public:
 
 
         // PLAYER CARDS
-        draw_bitmap(bitmap_named("Player Card 1"), card1.x, card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-        draw_bitmap(bitmap_named("Player Card 2"), card2.x, card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
-        
+
+        if (players[0].last_action != FOLD)
+        {
+            draw_bitmap(bitmap_named("Player Card 1"), card1.x, card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+            draw_bitmap(bitmap_named("Player Card 2"), card2.x, card2.y, option_scale_bmp(card_scale_factor, card_scale_factor));
+        }
 
         #pragma region Buttons
         if (round.turn_i == 0)
@@ -411,7 +494,7 @@ public:
         }   
 
         
-        draw_button(chips_display, COLOR_BLACK, "Chips: " + to_string(players[0].chips));
+        draw_player_chips(players[0].chips, chips_x, chips_y, chips_width, chips_height);
         #pragma endregion
 
 
@@ -438,26 +521,20 @@ public:
         
 
 
-
-
-        // Draws AI CARDS
+        
+                // Draws AI CARDS
         for (int i = 1; i < 4; i++)
         {
-            if (players[i].fold != true)
-            {
-                draw_ai_cards(i);
-            }
+
+            draw_ai(i, players[i]);
+
         }
+        
 
-
-
-
-        draw_text_bubble("FOLD", 590, 10);   // above top player
-
+        draw_pot(round.pot);
 
 
         
-        refresh_screen(60);
     }
 };
 
@@ -645,11 +722,11 @@ public:
         {
             if (suit[i] == 5)
             {
-                for (int i = 6; i > 3; i--)
+                for (int j = 6; j > 3; j--)
                 {
-                    if (cards[i]->suit == i)
+                    if (cards[j]->suit == i)
                     {
-                        return hand_hash(FLUSH, cards[i]->rank, 0);
+                        return hand_hash(FLUSH, cards[j]->rank, 0);
                     }
                 }
             }
@@ -903,6 +980,10 @@ public:
         return false;
     }
 
+    void ai_turn(const p_round &round, const int &index )
+    {
+        
+    }
     void player_turn(betting_display &display, p_round &round)
     {
 
@@ -1007,7 +1088,7 @@ public:
 
 
 
-    fixed_array<card* , 5> return_centre()
+    fixed_array<card* , 5>& return_centre()
     {
         return board_cards;
     }
@@ -1017,7 +1098,7 @@ public:
         return players[index];
     }
 
-    fixed_array<player, 4> return_players()
+    fixed_array<player, 4>& return_players()
     {
         return players;
     }
@@ -1051,14 +1132,27 @@ int main()
 
     new_round.blind_i = 0;
     new_round.call_amount = 50;
-    new_round.card_count = 3;
-    new_round.pot = 0;
+    new_round.card_count = 5;
+    new_round.pot = 500;
     new_round.turn_i = 0;
+
+
+    for (int i = 1; i < 4; i++)
+    {
+        new_game.return_players()[i].chips = rnd(1,5000);
+    }
+    new_game.return_players()[1].last_action = FOLD;
+    
+    new_game.return_players()[2].last_action = CALL;
+    new_game.return_players()[3].raise_amount = 50;
+    new_game.return_players()[3].last_action = RAISE;
     while (!quit_requested())
     {
-
+        write_line("CHECK");
         clear_screen(COLOR_GREEN);
+        write_line("CHECK");
         process_events();
+        write_line("CHECK");
         if (key_down(LEFT_KEY))
         {
             move1 -= speed;
@@ -1077,9 +1171,9 @@ int main()
         }
 
 
-
-        process_events();
         betting.display(new_round, new_game.return_players(), 0, 0, 50);
+        write_line("CHECK");
+        refresh_screen(60);
         //new_game.player_turn(call_amount,betting,5);
     }
 
