@@ -48,6 +48,7 @@ struct card
     rank_type rank;
     bool drawn = false;
     bitmap face;
+    bool out_check = false; //FOR USE IN CALCULATING OUTS
 };
 
 
@@ -76,7 +77,7 @@ struct player
     bool user;
     bool fold = false;
 
-    int hand_score;
+    int hand_score = 0;
     int last_action = NO_ACTION;
     int bet = 0;
     int chips;
@@ -1303,8 +1304,9 @@ public:
         return hand_hash(HIGH_CARD, cards[total - 1]->rank, 0);
     }
 
-    int hand_eval(player &player, const p_round &round)
+    int hand_eval(player &player, const p_round &round, card *extra_card = nullptr)
     {
+        
         fixed_array<card *, 7> cards;
 
         int total = round.card_count + 2;
@@ -1319,6 +1321,12 @@ public:
             {
                 cards[i] = board_cards[i - 2];
             }
+        }
+
+        if (extra_card != nullptr && total < 7)
+        {
+            cards[total] = extra_card;
+            total ++;
         }
 
         // SORT THEM
@@ -1378,7 +1386,51 @@ public:
     }
 
 
+    bool is_top_pair(player &player, const p_round &round)
+    {
+        int top_card = 0;
+        for (int i = 0; i < round.card_count; i++)
+        {
+            if (board_cards[i]->rank > top_card)
+            {
+                top_card = board_cards[i]->rank;
+            }
+        }
 
+        if (player.hand[0]->rank == top_card || player.hand[1]->rank == top_card)
+        {
+            return true;
+        }
+        else if (player.hand[0]->rank == player.hand[1]->rank && player.hand[0]->rank > top_card)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    int count_outs(player &player, const p_round &round)
+    {
+        int outs = 0;
+        for (int i = 0; i++; i < 2)
+        {
+            player.hand[i]->out_check = true;
+        }
+        for (int i = 0; i < round.card_count; i++)
+        {
+            board_cards[i]->out_check = true;
+        }
+
+        for (int i = 0; i < 52; i++)
+        {
+            if (!deck[i].out_check)
+            {
+                player.hand_score/1000 < hand_eval(player,round, &deck[i]) /1000;
+                outs++;
+            }
+        }
+    }
 
     //CLICK CHECK
 
