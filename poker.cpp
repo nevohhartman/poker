@@ -4,6 +4,14 @@
 const int BIG_BLIND = 20;
 const int SMALL_BLIND = BIG_BLIND * 0.5;
 
+enum round_state
+{
+    PRE_FLOP = 0,
+    FLOP = 1,
+    TURN = 2,
+    RIVER = 3,
+    SHOWDOWN = 4
+};
 enum suit_type
 {
     CLUBS = 0,
@@ -42,6 +50,12 @@ enum hand_type
     STRAIGHT_FLUSH = 8
 };
 
+struct pot
+{
+    int amount = 0;
+    fixed_array<player *, 4> contributors;
+};
+
 struct card
 {
     suit_type suit;
@@ -57,7 +71,8 @@ enum actions
     CALL = 1,
     RAISE = 2,
     FOLD = 3,
-    ALL_IN = 4
+    ALL_IN = 4,
+    CHECK = 5
 };
 
 enum p_type
@@ -74,29 +89,27 @@ struct player
     string name;
     bitmap avatar;
     fixed_array<card *, 2> hand;
-    bool user;
     bool fold = false;
-
     int hand_score = 0;
     int last_action = NO_ACTION;
     int bet = 0;
     int chips;
-
     int raise_amount;
-
     double image_x;
     double image_y;
     p_type pers;
     int position;
+    int total_comp;
 };
 
 struct p_round
 {
-    int pot = 0;
+    fixed_array<pot, 3> pots;
     int card_count = 0;
     int blind_i = 0;
     int call_amount = 0;
     int turn_i = 0;
+    int sb_i;
 };
 
 class betting_display
@@ -504,10 +517,9 @@ public:
             draw_ai(i, players[i]);
         }
 
-        draw_pot(round.pot);
+        draw_pot(round.pot.amount);
     }
 };
-
 
 class game
 {
@@ -516,11 +528,9 @@ private:
     fixed_array<card *, 5> board_cards;
     fixed_array<player, 4> players;
     p_round round;
+    betting_display display;
 
 
-    bool flop;
-    bool turn;
-    bool river;
     const int CARD_DELAY = 500;
     const double fold_width = 133.33;
     const double fold_height = 60;
@@ -594,10 +604,9 @@ private:
     // Array is sized [15][15][2] so ranks map directly to their int value
     // indices 0 and 1 are unused
 
-
     int max(const int &a, const int &b)
     {
-        if (a > b)
+        if (a >= b)
         {
             return a;
         }
@@ -609,7 +618,7 @@ private:
 
     int min(const int &a, const int &b)
     {
-        if (a < b)
+        if (a <= b)
         {
             return a;
         }
@@ -949,11 +958,10 @@ public:
         players[3].image_x = 45;
         players[3].image_y = 175;
 
-
-        //ROUND
+        // ROUND
 
         round.blind_i = 0;
-        round.pot = 0;
+        round.pot.amount = 0;
         round.call_amount = 0;
         round.turn_i = 0;
         round.card_count = 0;
@@ -988,9 +996,12 @@ public:
     {
         for (int i = 0; i < 4; i++)
         {
-            for (int j = 0; j < 2; j++)
+            if (players[i].chips > 0)
             {
-                players[i].hand[j] = deal();
+                for (int j = 0; j < 2; j++)
+                {
+                    players[i].hand[j] = deal();
+                }
             }
         }
 
@@ -1180,7 +1191,7 @@ public:
         return hand_hash(HIGH_CARD, cards[total - 1]->rank, 0);
     }
 
-    int hand_eval(player &player,card *extra_card = nullptr)
+    int hand_eval(player &player, card *extra_card = nullptr)
     {
 
         fixed_array<card *, 7> cards;
@@ -1322,8 +1333,6 @@ public:
         return outs;
     }
 
-    
-
     void pre_flop()
     {
 
@@ -1419,7 +1428,7 @@ public:
     float spr()
     {
         int min_chips = players[0].chips;
-        for(int i = 1; i < 4; i++)
+        for (int i = 1; i < 4; i++)
         {
             if (!players[i].fold && players[i].chips < min_chips)
             {
@@ -1445,24 +1454,22 @@ public:
 
         if (player.hand_score / 10000 >= STRAIGHT)
         {
-            return min(player.chips, (int)(personality_factor*0.75*round.pot));
+            return min(player.chips, (int)(personality_factor * 0.75 * round.pot));
         }
         else if (player.hand_score / 10000 >= TWO_PAIR)
         {
-            return min(player.chips, (int)(personality_factor*0.6*round.pot));
+            return min(player.chips, (int)(personality_factor * 0.6 * round.pot));
         }
         else if (is_top_pair(player))
         {
-            return min(player.chips, (int)(personality_factor*0.5*round.pot));
+            return min(player.chips, (int)(personality_factor * 0.5 * round.pot));
         }
-
 
         return -1;
     }
 
     int outs()
     {
-
 
         if (round.card_count >= 5)
         {
@@ -1479,14 +1486,13 @@ public:
             equity = outs_fraction * 2;
         }
 
-
         equity += p_equity_adjust(players[round.turn_i]);
-        
-        if(equity >= pot_odds(round.call_amount))
+
+        if (equity >= pot_odds(round.call_amount))
         {
             if (outs_fraction >= 0.08 && agressive(players[round.turn_i]))
             {
-                return min(players[round.turn_i].chips, (int)(0.66*round.pot));
+                return min(players[round.turn_i].chips, (int)(0.66 * round.pot));
             }
             else
             {
@@ -1496,7 +1502,6 @@ public:
 
         return -1;
     }
-
 
     int flop_and_turn_bet()
     {
@@ -1515,27 +1520,25 @@ public:
         }
         else if (spr <= 8)
         {
-            if(hand_type >= TWO_PAIR)
+            if (hand_type >= TWO_PAIR)
             {
                 return spr_bet;
             }
         }
-        else 
+        else
         {
-            if(hand_type >= STRAIGHT)
+            if (hand_type >= STRAIGHT)
             {
                 return spr_bet;
             }
         }
-
 
         int outs_bet = outs();
 
-        if ( outs_bet != -1)
+        if (outs_bet != -1)
         {
             return outs_bet;
         }
-
 
         if (!agressive(players[round.turn_i]))
         {
@@ -1543,19 +1546,162 @@ public:
         }
         else if (players[round.turn_i].pers == TA && rnd(100) < 15)
         {
-            
-            return min(players[round.turn_i].chips, (int)(0.66*round.pot));
+
+            return min(players[round.turn_i].chips, (int)(0.66 * round.pot.amount));
         }
         else if (players[round.turn_i].pers == LA && rnd(100) < 30)
         {
-            return min(players[round.turn_i].chips, (int)(0.66*round.pot));
+            return min(players[round.turn_i].chips, (int)(0.66 * round.pot.amount));
         }
-
 
         return -1;
     }
+
+    void flop_and_turn()
+    {
+        int bet = flop_and_turn_bet();
+
+        if (bet != -1)
+        {
+            bet = max(bet, round.call_amount);
+            players[round.turn_i].bet = bet;
+
+            if (bet == round.call_amount)
+            {
+                players[round.turn_i].last_action = CALL;
+            }
+            else
+            {
+                round.call_amount = bet;
+                players[round.turn_i].last_action = RAISE;
+                players[round.turn_i].raise_amount = bet;
+            }
+
+            if (bet == players[round.turn_i].chips)
+            {
+                players[round.turn_i].last_action = ALL_IN;
+            }
+
+            players[round.turn_i].chips -= bet;
+            round.pot.amount += bet;
+            players[round.turn_i].total_comp += bet;
+        }
+        else
+        {
+            if (round.call_amount == 0)
+            {
+                players[round.turn_i].bet = 0;
+                players[round.turn_i].last_action = CHECK;
+            }
+            players[round.turn_i].last_action = FOLD;
+        }
+    }
+
+    int river_bet()
+    {
+        players[round.turn_i].hand_score = hand_eval(players[round.turn_i]);
+
+        int type = players[round.turn_i].hand_score / 10000;
+
+        if (type >= STRAIGHT)
+        {
+            return min(round.pot, players[round.turn_i].chips);
+        }
+        else if (type >= TWO_PAIR)
+        {
+            return min((int)(0.75 * round.pot), players[round.turn_i].chips);
+        }
+        else if (type >= PAIR && pot_odds(round.call_amount) <= 0.33)
+        {
+            return round.call_amount;
+        }
+        else if (agressive(players[round.turn_i]))
+        {
+            if (rnd(100) < 20 && players[round.turn_i].pers == TA)
+            {
+                return min(players[round.turn_i].chips, (int)(0.85 * round.pot));
+            }
+            else if (rnd(100) < 35 && players[round.turn_i].pers == LA)
+            {
+                return min(players[round.turn_i].chips, (int)(0.95 * round.pot));
+            }
+
+            return -1;
+        }
+
+        return -1;
+    }
+
+    void river()
+    {
+        int bet = river_bet();
+
+        if (bet != -1)
+        {
+
+            bet = max(bet, round.call_amount);
+
+            players[round.turn_i].bet = bet;
+
+            if (bet == round.call_amount)
+            {
+                if (bet == 0)
+                {
+                    players[round.turn_i].last_action = CHECK;
+                }
+                else
+                {
+                    players[round.turn_i].last_action = CALL;
+                }
+            }
+            else
+            {
+                round.call_amount = bet;
+                players[round.turn_i].last_action = RAISE;
+                players[round.turn_i].raise_amount = bet;
+            }
+
+            if (bet == players[round.turn_i].chips)
+            {
+                players[round.turn_i].last_action = ALL_IN;
+            }
+
+            players[round.turn_i].chips -= bet;
+            round.pot.amount += bet;
+            players[round.turn_i].total_comp += bet;
+        }
+        else
+        {
+            if (round.call_amount == 0)
+            {
+                players[round.turn_i].bet = 0;
+                players[round.turn_i].last_action = CHECK;
+            }
+            else
+            {
+                players[round.turn_i].last_action = FOLD;
+            }
+        }
+    }
     // CLICK CHECK
 
+    int showdown()
+    {
+        int best = 0;
+        for (int i = 1; i < 4; i++)
+        {
+            if (!players[i].fold)
+            {
+                players[i].hand_score = hand_eval(players[i]);
+                if (players[i].hand_score > players[best].hand_score)
+                {
+                    best = i;
+                }
+            }
+        }
+
+        return i;
+    }
     bool click_check(const rectangle &bound)
     {
         if (mouse_clicked(LEFT_BUTTON) && point_in_rectangle(mouse_position(), bound))
@@ -1581,10 +1727,7 @@ public:
         return false;
     }
 
-    void ai_turn(const p_round &round, const int &index)
-    {
-    }
-    void player_turn(betting_display &display, p_round &round)
+    void player_turn()
     {
 
         players[0].bet = 0;
@@ -1646,7 +1789,7 @@ public:
         // PROCESS TURN
 
         players[0].chips -= players[0].bet;
-        pot += players[0].bet;
+        round.pot += players[0].bet;
     }
 
     // BUTTONS
@@ -1668,18 +1811,7 @@ public:
         return true;
     }
 
-    void new_round(int number_of_players)
-    {
-        blind_i++;
-        for (int i = 0; i < number_of_players; i++)
-        {
-            players[i].bet = 0;
-            players[i].fold = false;
-        }
 
-        players[blind_i - 1 % 4].bet = SMALL_BLIND;
-        players[blind_i % 4].bet = BIG_BLIND;
-    }
 
     fixed_array<card *, 5> &return_centre()
     {
@@ -1694,6 +1826,117 @@ public:
     fixed_array<player, 4> &return_players()
     {
         return players;
+    }
+
+    void new_round()
+    {
+        round.blind_i = (round.blind_i + 1) % 4;
+        for (int i = 0; i < 4; i++)
+        {
+            players[i].bet = 0;
+            players[i].total_comp = 0
+            players[i].fold = false;
+            bool fold = false;
+            int hand_score = 0;
+            int last_action = NO_ACTION;
+            int bet = 0;
+            int chips = 0;
+            int raise_amount = 0;
+            int position;
+            int total_comp;
+        }
+    }
+
+    void r_state_switch()
+    {
+        switch (round.card_count)
+        {
+        case 0:
+            pre_flop();
+            break;
+        case 3:
+            flop_and_turn();
+            break;
+        case 4:
+            flop_and_turn();
+            break;
+        case 5:
+            river();
+            break;
+        default:
+            break;
+        }
+    }
+    void r_cycle()
+    {
+
+        for (int i = 0; i < 4; i++)
+        {
+            if(round.card_count == 0)
+            {
+                round.turn_i = (round.blind_i + 1 + i) % 4;
+            }
+            else
+            {
+                round.turn_i = (round.blind_i - 1 + i) % 4;
+            }
+
+            if (round.turn_i = 0)
+            {
+                player_turn();
+            }
+            else if (players[round.turn_i].chips > 0)
+            {
+                r_state_switch();
+            }
+        }
+        while (!betting_complete(round.call_amount))
+        {
+            for (int i = 1; i < 5; i++)
+            {
+                round.turn_i = (round.blind_i + i) % 4;
+
+                if (round.turn_i = 0)
+                {
+                    player_turn();
+                }
+                else if (players[round.turn_i].chips > 0 && !players[round.turn_i].fold)
+                {
+                    r_state_switch();
+                }
+            }
+        }
+        
+    }
+    void round_runner(const int &blind_i)
+    {
+        p_round round;
+        round.blind_i = (blind_i + 1) % 4;
+
+        reshuffle();
+        deal_cards();
+
+        active_players();
+
+        if (active_players() < 4)
+        {
+            while (players[round.blind_i].chips <= 0)
+            {
+                round.blind_i = (round.blind_i + 1) % 4;
+            }
+
+            round.sb_i = (round.blind_i - 1) % 4;
+
+            while (players[round.sb_i].chips <= 0)
+            {
+                round.sb_i = (round.sb_i - 1) % 4;
+            }
+        }
+
+        r_cycle()
+
+        round.card_count = 3;
+        r_cycle()
     }
 };
 
@@ -1769,3 +2012,4 @@ int main()
     write_line(to_string(move1) + " " + to_string(move2));
     return 0;
 }
+add all in and check to visuals for ai and player.
