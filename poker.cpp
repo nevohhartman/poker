@@ -20,6 +20,14 @@ enum suit_type
     SPADES = 3
 };
 
+enum animation
+{
+    DEAL = 0,
+    FLOP = 1,
+    TURN = 2,
+    RIVER = 3,
+    
+};
 enum rank_type
 {
     TWO = 2,
@@ -364,6 +372,10 @@ public:
         case FOLD:
             draw_text_bubble("FOLD", player.image_x, player.image_y - 35.00);
             break;
+        case CHECK:
+            draw_text_bubble("CHECK", player.image_x, player.image_y - 35.00);
+        case ALL_IN:
+            draw_text_bubble("ALL IN", player.image_x, player.image_y - 35.00);
         default:
             break;
         }
@@ -453,7 +465,7 @@ public:
                   x + (width - tw) / 2,
                   y + (height - th) / 2);
     }
-    void display(const p_round &round, const fixed_array<player, 4> &players, double move1 = 0, double move2 = 0, const int &raise_amount = 50)
+    void display(const p_round &round, const fixed_array<player, 4> &players, double move1 = 0, double move2 = 0, const int &raise_amount, const int)
     {
 
         // PLAYER CARDS
@@ -506,6 +518,8 @@ public:
             draw_bitmap(bitmap_named("Centre Card " + to_string(i + 1)), centre_card1.x + i * (card_spacing + card_width), centre_card1.y, option_scale_bmp(card_scale_factor, card_scale_factor));
         }
 
+
+
         draw_bitmap("p2", 590, 45);   // top centre (opponent)
         draw_bitmap("p3", 45, 175);   // left (opponent)
         draw_bitmap("p1", 1005, 175); // right (opponent)
@@ -528,8 +542,7 @@ private:
     fixed_array<card *, 5> board_cards;
     fixed_array<player, 4> players;
     p_round round;
-    betting_display display;
-
+    betting_display display = betting_display(players[0].hand, board_cards);
 
     const int CARD_DELAY = 500;
     const double fold_width = 133.33;
@@ -1011,8 +1024,6 @@ public:
         }
     }
 
-
-
     void insertion_sort(fixed_array<card *, 7> &cards, const int &total)
     {
         for (int i = 1; i < total; i++)
@@ -1335,6 +1346,24 @@ public:
         return outs;
     }
 
+    void player_bet(const int &index, const int &bet)
+    {
+        int to_add = bet - players[index].bet;
+        to_add = min(to_add, players[index].chips);
+
+        if (to_add < 0)
+        {
+            to_add = 0;
+        }
+        players[index].bet += to_add;
+        players[index].chips -= to_add;
+
+        if (players[index].chips == 0)
+        {
+            players[index].last_action = ALL_IN;
+        }
+    }
+
     void pre_flop()
     {
 
@@ -1399,27 +1428,33 @@ public:
                 round.call_amount = bet;
                 players[round.turn_i].last_action = RAISE;
                 players[round.turn_i].raise_amount = bet;
+                player_bet(round.turn_i, bet);
             }
             else if (equity >= pot_odds(round.call_amount))
             {
                 players[round.turn_i].last_action = CALL;
-                players[round.turn_i].bet = round.call_amount;
+                bet = round.call_amount;
+                player_bet(round.turn_i, bet);
             }
             else
             {
                 players[round.turn_i].last_action = FOLD;
             }
+
+            
         }
         else if (equity >= pot_odds(raise_amount))
         {
             round.call_amount = raise_amount;
             players[round.turn_i].last_action = RAISE;
             players[round.turn_i].raise_amount = raise_amount;
+
+            player_bet(round.turn_i, raise_amount);
         }
         else if (equity >= cutoff)
         {
             players[round.turn_i].last_action = CALL;
-            players[round.turn_i].bet = round.call_amount;
+            player_bet(round.turn_i, round.call_amount);
         }
         else
         {
@@ -1549,11 +1584,11 @@ public:
         else if (players[round.turn_i].pers == TA && rnd(100) < 15)
         {
 
-            return min(players[round.turn_i].chips, (int)(0.66 * round.pot.amount));
+            return min(players[round.turn_i].chips, (int)(0.66 * round.pot));
         }
         else if (players[round.turn_i].pers == LA && rnd(100) < 30)
         {
-            return min(players[round.turn_i].chips, (int)(0.66 * round.pot.amount));
+            return min(players[round.turn_i].chips, (int)(0.66 * round.pot));
         }
 
         return -1;
@@ -1566,7 +1601,7 @@ public:
         if (bet != -1)
         {
             bet = max(bet, round.call_amount);
-            players[round.turn_i].bet = bet;
+            
 
             if (bet == round.call_amount)
             {
@@ -1579,14 +1614,7 @@ public:
                 players[round.turn_i].raise_amount = bet;
             }
 
-            if (bet == players[round.turn_i].chips)
-            {
-                players[round.turn_i].last_action = ALL_IN;
-            }
-
-            players[round.turn_i].chips -= bet;
-            round.pot.amount += bet;
-            players[round.turn_i].total_comp += bet;
+            player_bet(round.turn_i, bet);
         }
         else
         {
@@ -1595,7 +1623,10 @@ public:
                 players[round.turn_i].bet = 0;
                 players[round.turn_i].last_action = CHECK;
             }
-            players[round.turn_i].last_action = FOLD;
+            else
+            {
+                players[round.turn_i].last_action = FOLD;
+            }
         }
     }
 
@@ -1644,7 +1675,7 @@ public:
 
             bet = max(bet, round.call_amount);
 
-            players[round.turn_i].bet = bet;
+            
 
             if (bet == round.call_amount)
             {
@@ -1664,14 +1695,8 @@ public:
                 players[round.turn_i].raise_amount = bet;
             }
 
-            if (bet == players[round.turn_i].chips)
-            {
-                players[round.turn_i].last_action = ALL_IN;
-            }
+            player_bet(round.turn_i, bet);
 
-            players[round.turn_i].chips -= bet;
-            round.pot += bet;
-            players[round.turn_i].total_comp += bet;
         }
         else
         {
@@ -1688,35 +1713,6 @@ public:
     }
     // CLICK CHECK
 
-    fixed_array<bool, 4> showdown(const int &pot_index)
-    {
-        fixed_array<bool, 4> winners;
-        int best = -1;
-        for(int i = 0; i < 4; i++)
-        {
-            winners[i] = false;
-
-            if(round.pots[pot_index].eligible[i])
-            {
-                players[i].hand_score = hand_eval(players[i]);
-
-                if (players[i].hand_score > best)
-                {
-                    best = players[i].hand_score;
-                }
-            }
-        }
-
-        for(int i = 0; i < 4; i++)
-        {
-            if(round.pots[pot_index].eligible[i] && players[i].hand_score == best)
-            {
-                winners[i] = true;
-            }
-        }
-
-        return winners;
-    }
     bool click_check(const rectangle &bound)
     {
         if (mouse_clicked(LEFT_BUTTON) && point_in_rectangle(mouse_position(), bound))
@@ -1745,13 +1741,12 @@ public:
     void player_turn()
     {
 
-        players[0].bet = 0;
 
         bool turn_complete = false;
         int min_raise = round.call_amount;
         int raise_amount = min_raise;
         int raise_increment = BIG_BLIND;
-
+        int bet;
         while (!turn_complete && !quit_requested())
         {
             clear_screen(COLOR_GREEN);
@@ -1762,17 +1757,16 @@ public:
             if (click_check(fold_button))
             {
                 players[0].fold = true;
-                players[0].bet = 0;
                 turn_complete = true;
             }
             else if (click_check(all_in_button))
             {
-                players[0].bet = players[0].chips;
+                player_bet(0, players[0].chips);
                 turn_complete = true;
             }
             else if (click_check(call_button) && round.call_amount <= players[0].chips)
             {
-                players[0].bet = round.call_amount;
+                player_bet(0, round.call_amount);
                 turn_complete = true;
             }
             else if (click_check(minus_button) && raise_amount != min_raise)
@@ -1796,15 +1790,10 @@ public:
             }
             else if (click_check(raise_button))
             {
-                players[0].bet = raise_amount + round.call_amount;
+                player_bet(0, raise_amount + round.call_amount);
                 turn_complete = true;
             }
         }
-
-        // PROCESS TURN
-
-        players[0].chips -= players[0].bet;
-        round.pot += players[0].bet;
     }
 
     // BUTTONS
@@ -1813,214 +1802,262 @@ public:
 
     // BETTING
 
-    bool betting_complete(int current_bet)
-    {
-        for (int i = 0; i < 4; i++)
-        {
-            if (!players[i].fold && players[i].bet != current_bet)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-
-
-    fixed_array<card *, 5> &return_centre()
-    {
-        return board_cards;
-    }
-
-    player &return_player(int index)
-    {
-        return players[index];
-    }
-
-    fixed_array<player, 4> &return_players()
-    {
-        return players;
-    }
-
     void new_round()
     {
         round.blind_i = (round.blind_i + 1) % 4;
         for (int i = 0; i < 4; i++)
         {
-            players[i].bet = 0;
-            players[i].total_comp = 0;
-            players[i].fold = false;
+            if(players[i].chips > 0)
+            {
+                players[i].fold = false;
+            }
+            else
+            {
+                players[i].fold = true;
+            }
+
             players[i].hand_score = 0;
             players[i].last_action = NO_ACTION;
             players[i].bet = 0;
-            players[i].chips = 0;
             players[i].raise_amount = 0;
             players[i].total_comp = 0;
         }
 
         round.card_count = 0;
-        
+
         for (int i = 0; i < 3; i++)
         {
             round.pots[i].amount = 0;
             for (int j = 0; j < 4; j++)
             {
-                round.pots[i].eligible[j] = nullptr;
+                round.pots[i].eligible[j] = false;
             }
         }
     }
 
     void r_state_switch()
     {
-        switch (round.card_count)
+        if(round.turn_i == 0)
         {
-        case 0:
-            pre_flop();
-            break;
-        case 3:
-            flop_and_turn();
-            break;
-        case 4:
-            flop_and_turn();
-            break;
-        case 5:
-            river();
-            break;
-        default:
-            break;
+            player_turn();
+        }
+        else
+        {
+            switch (round.card_count)
+            {
+            case 0:
+                pre_flop();
+                break;
+            case 3:
+                flop_and_turn();
+                break;
+            case 4:
+                flop_and_turn();
+                break;
+            case 5:
+                river();
+                break;
+            default:
+                break;
+            } 
         }
     }
 
+    void blind_bet(const int &blind, const int &index)
+    {
+        int bet = min(players[index].chips, blind);
 
+        player_bet(index, bet);
+    }
+
+    bool active(const int &i)
+    {
+        if (players[i].last_action != FOLD && players[i].last_action != ALL_IN && players[i].chips > 0) 
+        {
+            return true;
+        }
+        
+        return false;
+    }
+
+    int active_betters()
+    {
+        int count = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            if (active(i)) 
+            {
+                count ++;
+            }
+        }
+
+        return count;
+    }
 
     void r_cycle()
     {
 
-        players[round.blind_i].bet = BIG_BLIND;
-        players[round.blind_i].chips -= BIG_BLIND;
-        round.pot += BIG_BLIND;
+        if (round.card_count == 0)
+        {
+            round.call_amount = BIG_BLIND;
+            blind_bet(BIG_BLIND, round.blind_i);
+            blind_bet(SMALL_BLIND, round.sb_i);
 
-        players[(round.blind_i - 1) % 4].bet = SMALL_BLIND;
-        players[(round.blind_i - 1) % 4].chips -= SMALL_BLIND;
-        round.pot += SMALL_BLIND;
+            round.turn_i = (round.blind_i + 1) % 4;
+
+            while (players[round.turn_i].chips <= 0)
+            {
+                round.turn_i = (round.turn_i + 1) % 4;
+            }
+        }
+        else
+        {
+            round.turn_i = round.sb_i;
+            round.call_amount = 0;
+        }
+
+
+        int to_act = active_betters();
+
+
+        while (to_act != 0 && active_betters() > 1)
+        {
+            
+
+            if(active(round.turn_i))
+            {
+                int call = round.call_amount;
+                r_state_switch();
+
+
+                if( call < round.call_amount)
+                {
+                to_act = active_betters() - 1;
+                }
+                else
+                {
+                to_act --;
+                }
+            }
+
+            round.turn_i = (round.turn_i + 1) % 4;
+
+        }
+
+
 
         for (int i = 0; i < 4; i++)
         {
-            if(round.card_count == 0)
-            {
-                round.turn_i = (round.blind_i + 1 + i) % 4;
-            }
-            else
-            {
-                round.turn_i = (round.blind_i - 1 + i) % 4;
-            }
-
-            if (round.turn_i = 0)
-            {
-                player_turn();
-            }
-            else if (players[round.turn_i].chips > 0)
-            {
-                r_state_switch();
-            }
-        }
-        while (!betting_complete(round.call_amount))
-        {
-            for (int i = 1; i < 5; i++)
-            {
-                round.turn_i = (round.blind_i + i) % 4;
-
-                if (round.turn_i = 0)
-                {
-                    player_turn();
-                }
-                else if (players[round.turn_i].chips > 0 && !players[round.turn_i].fold)
-                {
-                    r_state_switch();
-                }
-            }
+            round.pot += players[i].bet;
+            players[i].total_comp += players[i].bet;
+            players[i].bet = 0;
         }
         
     }
 
-    void insertion_sort_4(fixed_array<player*, 4> &players)
+
+    int find_min_comp()
     {
-        for (int i = 1; i < 4; i++)
-        {
-            player *key = players[i];
-            int j = i - 1;
-            while (j >= 0 && players[j]->total_comp > key->total_comp)
-            {
-                players[j + 1] = players[j];
-                j--;
-            }
-            players[j + 1] = key;
-        }
-    }
-
-
-    void pot_split()
-    {
-        int min_comp = 0;
-
-        fixed_array<player* , 4> comp_list;
+        int min_comp = -1;
 
         for (int i = 0; i < 4; i++)
         {
-            comp_list[i] = &players[i]; 
-        }
-
-        insertion_sort_4(comp_list);
-        int pot_index = 3;
-
-        for (int i = 0; i < 2; i++)
-        {
-            if(comp_list[i]->last_action == ALL_IN)
+            if (players[i].total_comp > 0)
             {
-                int comp = comp_list[i]->total_comp;
-                for (int j = i; j < 4; j++)
+                if (min_comp == -1 || players[i].total_comp < min_comp)
                 {
-                    comp_list[j]->total_comp -= comp;
-                    int index = comp_list[j] - &players[0]; //pointer arithm
-                    round.pots[pot_index].eligible[index] = true;
-                    round.pots[pot_index].amount += comp;
+                    min_comp = players[i].total_comp;
                 }
-
-                pot_index --;
             }
         }
 
-        for(int i = 0; i < 4; i++)
+        return min_comp;
+    }
+
+    fixed_array<bool, 4> showdown(const int &pot_index)
+    {
+        fixed_array<bool, 4> winners;
+        int best = -1;
+        for (int i = 0; i < 4; i++)
         {
-            round.pots[0].amount += players[i].total_comp;
-            players[i].total_comp = 0;
+            winners[i] = false;
+
+            if (round.pots[pot_index].eligible[i])
+            {
+                players[i].hand_score = hand_eval(players[i]);
+
+                if (players[i].hand_score > best)
+                {
+                    best = players[i].hand_score;
+                }
+            }
         }
 
-        for (int i = 2; i > - 1; i--)
+        for (int i = 0; i < 4; i++)
         {
-            fixed_array<bool, 4> winners = showdown(i);
-
-            int count = 0;
-
-            for(int j = 0; j < 4; j++)
+            if (round.pots[pot_index].eligible[i] && players[i].hand_score == best)
             {
-                if(winners[j])
+                winners[i] = true;
+            }
+        }
+
+        return winners;
+    }
+
+    void pot_split()
+    {
+        int pot_index = 0;
+        int min_comp = 0;
+        fixed_array<bool, 4> winners;
+        while (pot_index < 3)
+        {
+            min_comp = find_min_comp();
+
+            if (min_comp == -1)
+            {
+                break;
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                if (players[i].total_comp >= min_comp)
+                {
+                    round.pots[pot_index].amount += min_comp;
+                    players[i].total_comp -= min_comp;
+
+                    if (players[i].last_action != FOLD)
+                    {
+                        round.pots[pot_index].eligible[i] = true;
+                    }
+                }
+            }
+
+            winners = showdown(pot_index);
+            int count = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                if (winners[i])
                 {
                     count++;
                 }
             }
 
-            int split = round.pots[i].amount / count;
-            for (int j = 0; j < 4; j++)
+            if (count == 0)
             {
-                if (winners[j])
+                count = 1;
+            }
+
+            int split = round.pots[pot_index].amount / count;
+            for (int i = 0; i < 4; i++)
+            {
+
+                if (winners[i])
                 {
-                    players[j].chips += split;
+                    players[i].chips += split;
                 }
             }
-        }
 
+            pot_index++;
+        }
     }
     void round_runner()
     {
@@ -2035,24 +2072,36 @@ public:
                 round.blind_i = (round.blind_i + 1) % 4;
             }
 
-            round.sb_i = (round.blind_i - 1) % 4;
 
-            while (players[round.sb_i].chips <= 0)
-            {
-                round.sb_i = (round.sb_i - 1) % 4;
-            }
         }
 
-        r_cycle();
+        round.sb_i = (round.blind_i - 1 + 4) % 4;
+
+        while (players[round.sb_i].chips <= 0)
+        {
+            round.sb_i = (round.sb_i - 1 + 4) % 4;
+        }
+
+        if (active_betters() > 1)
+        {
+            r_cycle();
+        }
 
         round.card_count = 3;
-        r_cycle();
+        while (active_betters() > 1 && round.card_count < 5) 
+        {
+            r_cycle();
+            round.card_count ++;
+        }
 
-        round.card_count = 4;
-        r_cycle();
+        if (active_betters() > 1)
+        {
+            r_cycle();
+        }
 
-        round.card_count = 5;
-        r_cycle();
+
+
+        pot_split();
     }
 };
 
