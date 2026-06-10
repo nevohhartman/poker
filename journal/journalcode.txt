@@ -6,3 +6,6 @@ git push
 
 touch journal/2026-06-09.md
 code journal/2026-05-19.md
+
+
+clang++ poker.cpp  -o pokerun -l SplashKit -Wall
