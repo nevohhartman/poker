@@ -457,8 +457,8 @@ public:
         double text_x = x + (150 - tw) / 2;
         double text_y = y + 15;
 
-        color outline = COLOR_ORANGE;
-        color main = COLOR_CYAN;
+        color outline = COLOR_BLACK;
+        color main = COLOR_DODGER_BLUE;
 
         // draw outline in all 8 directions around the text
         for (int dx = -1; dx <= 1; dx++)
